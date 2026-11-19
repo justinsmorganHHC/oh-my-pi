@@ -92,6 +92,27 @@ function userMessage(content: string, timestamp: number): Message {
 	return { role: "user", content, timestamp } as Message;
 }
 
+/**
+ * Whether `text` is drawn with the faint attribute (SGR 2) in a rendered frame. Throws when the frame doesn't show
+ * `text` at all, so a "not faint" check can't pass on input the renderer dropped.
+ */
+function paintedFaint(frame: string, text: string): boolean {
+	const at = frame.indexOf(text);
+	if (at < 0) throw new Error(`frame does not show ${JSON.stringify(text)}`);
+	let faint = false;
+	for (const [, raw] of frame.slice(0, at).matchAll(/\x1b\[([0-9;]*)m/g)) {
+		const params = (raw ?? "").split(";");
+		for (let i = 0; i < params.length; i++) {
+			const p = params[i] || "0";
+			// Extended colours carry their own numbers (38;2;r;g;b, 38;5;n), never attributes.
+			if (p === "38" || p === "48" || p === "58") i += params[i + 1] === "2" ? 4 : 2;
+			else if (p === "2") faint = true;
+			else if (p === "0" || p === "22") faint = false;
+		}
+	}
+	return faint;
+}
+
 function harness(options: HarnessOptions = {}) {
 	const turns: PendingTurn[] = [];
 	const sessionManager = SessionManager.inMemory();
@@ -186,6 +207,36 @@ describe("ComposerPredictionController", () => {
 
 		expect(controller.choices).toEqual(["now run the tests"]);
 		expect(renders()).toBe(1);
+	});
+
+	it("paints the prediction faint and typed or accepted text plain, so a screen-reading multiplexer tells them apart", async () => {
+		const ghost = harness();
+		ghost.controller.request();
+		await ghost.reply(0, "now run the tests");
+		// tuios skips faint cells as suggestions (Claude Code and Codex draw theirs faint); a ghost drawn only
+		// in a dim colour reads as typed text and holds queued input behind it.
+		expect(paintedFaint(ghost.paint(), "now run the tests")).toBe(true);
+
+		// Typing a prefix keeps the rest as ghost: what was typed stays plain, so the box still reads as a draft.
+		ghost.type("now");
+		const partial = ghost.paint();
+		expect(paintedFaint(partial, "now")).toBe(false);
+		expect(paintedFaint(partial, "run the tests")).toBe(true);
+
+		// A draft of the person's own is never faint.
+		ghost.type("deploy");
+		expect(paintedFaint(ghost.paint(), "deploy")).toBe(false);
+
+		// Nor is a prediction accepted with Tab or Right: it is input now.
+		for (const key of ["\t", "\x1b[C"]) {
+			const accepted = harness();
+			accepted.controller.request();
+			await accepted.reply(0, "now run the tests");
+			accepted.paint();
+			accepted.editor.handleInput(key);
+			expect(accepted.editor.getText()).toBe("now run the tests");
+			expect(paintedFaint(accepted.paint(), "now run the tests")).toBe(false);
+		}
 	});
 
 	it("splits the reply into alternatives only with composer.predictionAlternatives on", async () => {

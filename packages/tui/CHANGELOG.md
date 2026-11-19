@@ -23,6 +23,7 @@
 - Fixed images from a previous session reappearing at the top-left of the screen after `/new` in herdr-app ([#19749](https://github.com/can1357/oh-my-pi/pull/19749) by [@jaredlyon](https://github.com/jaredlyon))
 - Loop-stall diagnostics (`ui.loop-blocked`) no longer sample the JS thread while no TUI runs, such as in an external editor or after the session ends ([#19703](https://github.com/can1357/oh-my-pi/pull/19703) by [@will-bogusz](https://github.com/will-bogusz))
 - Fixed the usage dashboard rendering exhausted or pressured usage rows without a quota bar (prepaid balances, spent quotas) as dim informational text; they now take the error or warning color their reported status calls for, and a spent quota with no measurable amount reads "exhausted" instead of "no data" ([#19764](https://github.com/can1357/oh-my-pi/issues/19764))
+- Composer ghost text (next-message predictions and word completions) is drawn faint as well as dim-coloured, so terminal multiplexers that read the screen, such as tuios, no longer take a prediction in an empty composer for a typed draft and hold queued input behind it
 
 ## [19.0.0] - 2026-11-18
 

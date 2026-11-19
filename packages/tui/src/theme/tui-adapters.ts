@@ -415,7 +415,9 @@ export function getEditorTheme(): EditorTheme {
 		textColor: (text: string) => theme.fgResolved("text", text),
 		selectList: getSelectListTheme(),
 		symbols: getSymbolTheme(),
-		hintStyle: (text: string) => theme.fg("dim", text),
+		// Faint as well as dim-coloured: terminal multiplexers that read the screen (tuios) skip faint cells as
+		// suggestions, the way Claude Code and Codex draw theirs, so a prediction doesn't read as a typed draft.
+		hintStyle: (text: string) => theme.fg("dim", `\x1b[2m${text}\x1b[22m`),
 	};
 }
 
